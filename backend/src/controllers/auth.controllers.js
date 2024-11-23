@@ -66,8 +66,99 @@ const registerUser = asyncHandler(async (req, res) => {
      return res
           .status(201)
           .json(new ApiResponse(200, createdUser, "User created successfull"));
-          
+
 })
 
 
-export { registerUser }
+const generateAccessAndRefreshToken = async (userid) => {
+     try {
+          const user = await User.findById(userid)
+          const accessToken = user.generateAccessToken()
+          const refreshToken = user.generateRefreshToken()
+          console.log("accesssToken_InFunction", accessToken)
+          console.log("refresToken_InFunction", refreshToken)
+          user.refreshToken = refreshToken;
+          user.save({ validateBeforeSave: false })
+          return { accessToken, refreshToken };
+     } catch (error) {
+          throw new ApiError(
+               500,
+               "Something went wrong while generating and refresh and acsess Token "
+          );
+     }
+}
+
+
+
+const loginUser = asyncHandler(async (req, res) => {
+
+     const { email, password } = req.body;
+     if (!email || !password) {
+          throw new ApiError(400, "Email and password both are required");
+     }
+
+     // now find the user
+     const user = await User.findOne({ email });
+     if (!user) {
+          throw new ApiError(404, 'User does not exist')
+     }
+
+     // now check is password is valid or not 
+     const isPasswordValid = await user.isPasswordCorrect(password)
+
+     if (!isPasswordValid) {
+          throw new ApiError(401, "Invalid password")
+     }
+
+     // now generate accessa and refreshToken
+     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
+
+     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+
+     const options = {
+          httpOnly: true,
+          // secure: process.env.NODE_ENV === 'production'
+     }
+     console.log("accesssToken", accessToken)
+     console.log("refresToken", refreshToken)
+     return res
+          .status(200)
+          .cookie("accessToken", accessToken, options)
+          .cookie("refreshToken", refreshToken, options)
+          .json(
+               new ApiResponse(
+                    200,
+                    {
+                         user: loggedInUser, accessToken, refreshToken
+                    },
+                    "User loggedIn successfully"
+               )
+          )
+
+
+})
+
+
+const logoutUser = asyncHandler(async (req, res) => {
+
+     await User.findByIdAndUpdate(
+          req.user._id,
+          {
+               $set: { refreshToken: undefined },
+               new: true
+          }
+     )
+
+     const options = {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production'
+
+     }
+     return res
+          .status(200)
+          .clearCookie("accessToken", options)
+          .clearCookie("refreshToken", options)
+          .json(new ApiResponse(200, {}, "User logged out successfully"))
+})
+
+export { registerUser, loginUser, logoutUser }
