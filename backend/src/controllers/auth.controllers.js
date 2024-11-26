@@ -4,6 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { uploadOnCloudinary } from '../services/cloudinary.services.js'
 import jwt from 'jsonwebtoken'
+import { generateOtp, hashOtp, verifyOtp, transporter, sendOtp } from '../services/auth.services.js'
 // import mongoose from 'mongoose'
 
 
@@ -194,4 +195,90 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
      }
 })
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken }
+const requestReset = asyncHandler(async (req, res) => {
+
+     try {
+          const OTP_EXPIRY = 2 * 60 * 1000
+          const { email } = req.body;
+          if (!email) {
+               throw new ApiError(400, "Email is required")
+          }
+
+          // retrive user and if exist or not
+          const user = await User.findOne({ email })
+          if (!user) {
+               throw new ApiError(404, "User not found")
+          }
+
+          // now generate Otp and hash it and
+          const otp = generateOtp();
+          const hashedOtp = await hashOtp(otp);
+
+          // save hashedOtp and expiry time  in user's db
+          user.otp = hashedOtp
+          user.otpExpiry = Date.now() + OTP_EXPIRY;
+          await user.save();
+
+          // send otp to user
+          await sendOtp(email, otp);
+
+          res
+               .status(200)
+               .json(
+                    new ApiResponse(200, "OTP sent to your mail")
+               )
+     } catch (error) {
+          console.log(error)
+          throw new ApiError(500, "Internal server error (reqest to reset pwd failed)")
+     }
+})
+
+const verifyOtpAndResetPassword = asyncHandler(async (req, res) => {
+     try {
+          const { email, otp, newPassword } = req.body
+          if (!email || !otp || !newPassword) {
+               throw new ApiError(400, "Email and OTP are required")
+          }
+          // now find user via email
+          const user = await User.findOne({ email })
+          if (!user) {
+               throw new ApiError(404, "User not found")
+          }
+          // check if otp is expires or not 
+          if (Date.now > user.otpExpiry) {
+               throw new ApiError(400, "Your otp has been expires")
+          }
+          const isOtpValid = verifyOtp(otp, user.otp)
+          if (!isOtpValid) {
+               throw new ApiError(400, "Invalid OTP")
+          }
+
+          // now clear otp and expiry field
+          user.otp = null
+          user.otpExpiry = null
+          user.password = newPassword
+          await user.save()
+
+          // send response
+          res
+               .status(200)
+               .json(
+                    new ApiResponse(
+                         200,
+                         "Password updated successfully"
+                    )
+               )
+     } catch (error) {
+          throw new ApiError(500, "Internal server error - on otp verification ")
+     }
+})
+
+
+export {
+     registerUser,
+     loginUser,
+     logoutUser,
+     refreshAccessToken,
+     requestReset,
+     verifyOtpAndResetPassword
+}

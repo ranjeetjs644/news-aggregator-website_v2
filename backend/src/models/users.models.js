@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema({
           type: String,
           required: true,
           index: true,
-          trim: true
+          trim: true,
+          unique: false
      },
      email: {
           type: String,
@@ -21,6 +22,14 @@ const userSchema = new mongoose.Schema({
           required: [true, 'password is required'],
           unique: true,
           trim: true
+     },
+     otp: {
+          type: String,
+          default: null
+     },
+     otpExpiry: {
+          type: Date,
+          default: null
      },
      refreshToken: {
           type: String,
@@ -82,11 +91,11 @@ userSchema.methods.generateAccessToken = function () {
 userSchema.methods.generateRefreshToken = function () {
      return jwt.sign(
           {
-               _id: this._id 
+               _id: this._id
           },
           process.env.REFRESH_TOKEN_SECRET,
           {
-               expiresIn:process.env.REFRESH_TOKEN_EXPIRY
+               expiresIn: process.env.REFRESH_TOKEN_EXPIRY
           }
      )
 }
