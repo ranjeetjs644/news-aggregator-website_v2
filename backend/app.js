@@ -4,7 +4,6 @@ import cors from 'cors'
 import errorMiddleware from './src/middlewares/error.middleware.js'
 const app = express();
 
-app.use(express.json());
 app.use(cors(
     {
         origin: process.env.CORS_ORIGIN,
@@ -15,12 +14,16 @@ app.use(cors(
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public"))
 app.use(cookieParser())
+app.use(express.json());
+app.use(upload.none())
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
 
 
 
 // import routes
-
 import authRouter from './src/routes/auth.routes.js'
+import { upload } from './src/middlewares/multer.middleware.js';
 app.use('/api/v1/auth', authRouter);
 
 

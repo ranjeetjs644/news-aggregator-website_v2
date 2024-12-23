@@ -37,7 +37,6 @@ const userSchema = new mongoose.Schema({
      },
      avatar: {
           type: String,
-          required: true
      },
      preferences: {
           categories: [String], // E.g., ['technology', 'sports']

@@ -1,12 +1,12 @@
 import React from 'react'
-
+import Header from '../components/Header.jsx'
 
 const Home = () => {
-    return <>
-        <div className=''>
-            <h1 className=' text-center mt-20'>this is my home content</h1>
+    return (
+        <div className='text-center mt-28'>
+            This is home page
         </div>
-    </>
+    )
 }
 
 export default Home
